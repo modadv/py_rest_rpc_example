@@ -1,6 +1,7 @@
 import msgpack
 import struct
 import hashlib
+import socket
 
 def md5_top_4_bytes(input_string):
     md5_hash = hashlib.md5()
@@ -19,10 +20,41 @@ def pack_rpc_header(magic_num, req_type, body_len, req_id, func_name):
 def pack_data(raw_data):
     packed_data = msgpack.packb(raw_data)
     return packed_data
-    
-if __name__ == "__main__":
-    msg_bytes = pack_data("test")
-    header_bytes = pack_rpc_header(39, 0, len(msg_bytes), 1, "echo")
+
+def pack_rpc_req(func_name, req_type,  req_id, data):
+    MAGIC_NUM = 39
+    msg_bytes = pack_data(data)
+    msg_len = len(msg_bytes)
+    if msg_len == 0:
+        return None
+    if len(msg_bytes) > 0xFFFF + 2:  # max 4 bytes for msg length
+        flag_len = 0x94
+        data_len = msg_len - 4
+    elif len(msg_bytes) > 256:
+        flag_len = 0x92
+        data_len = msg_len - 2
+    else:
+        flag_len = 0x91
+        data_len = msg_len - 1
+    msg_bytes = bytes([flag_len]) + msg_bytes
+    header_bytes = pack_rpc_header(MAGIC_NUM, req_type, len(msg_bytes), req_id, func_name)
     send_data = header_bytes + msg_bytes
-    print(bytes_to_hex(send_data))
+    return send_data
+
+if __name__ == "__main__":
+    serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    serv_addr_info = ("127.0.0.1", 9000)
+    serv.connect(serv_addr_info)
+    
+    try:
+        send_message = pack_rpc_req("echo", 0, 1, "test")
+        print(bytes_to_hex(send_message))
+        serv.sendall(send_message)
+        
+        recv_message = serv.recv(1024)
+        print('Received data: ', bytes_to_hex(recv_message))  # need to unpack
+    finally:
+        serv.close();
+    
+    
     
