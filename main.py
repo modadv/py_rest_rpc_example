@@ -21,22 +21,12 @@ def pack_data(raw_data):
     packed_data = msgpack.packb(raw_data)
     return packed_data
 
-def pack_rpc_req(func_name, req_type,  req_id, data):
+def pack_rpc_req(func_name, req_type,  req_id, req_data):
     MAGIC_NUM = 39
-    msg_bytes = pack_data(data)
-    msg_len = len(msg_bytes)
-    if msg_len == 0:
+    if req_data is None or len(req_data) == 0:
+        print("Empty data")
         return None
-    if len(msg_bytes) > 0xFFFF + 2:  # max 4 bytes for msg length
-        flag_len = 0x94
-        data_len = msg_len - 4
-    elif len(msg_bytes) > 256:
-        flag_len = 0x92
-        data_len = msg_len - 2
-    else:
-        flag_len = 0x91
-        data_len = msg_len - 1
-    msg_bytes = bytes([flag_len]) + msg_bytes
+    msg_bytes = bytes([0x91]) + pack_data(req_data)
     header_bytes = pack_rpc_header(MAGIC_NUM, req_type, len(msg_bytes), req_id, func_name)
     send_data = header_bytes + msg_bytes
     return send_data
